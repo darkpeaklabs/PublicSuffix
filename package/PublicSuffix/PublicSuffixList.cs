@@ -21,7 +21,7 @@ namespace DarkPeakLabs.PublicSuffix
 
         private DateTime? _timestamp;
         private List<string> _list;
-        private Dictionary<string, HashSet<string>> _lookupTable;
+        private PublicSuffixRule _rules;
 
         private List<string> List 
         {
@@ -69,70 +69,69 @@ namespace DarkPeakLabs.PublicSuffix
         {
             ArgumentNullException.ThrowIfNullOrWhiteSpace(domainName, nameof(domainName));
 
-            var originalNames = domainName.Split('.', StringSplitOptions.RemoveEmptyEntries);
-            if (originalNames.Length < 3)
+            var originalDomains = domainName.Split('.', StringSplitOptions.RemoveEmptyEntries);
+
+            var lookupDomains = _idnMapping.GetAscii(domainName)
+                .ToUpperInvariant()
+                .Split('.', StringSplitOptions.RemoveEmptyEntries);
+
+            var rule = _rules;
+
+            // If a hostname matches more than one rule in the file, the longest matching rule (the one with the most levels) will be used.
+            for (var i = lookupDomains.Length - 1; i >= 0; i--) 
             {
-                return domainName;
-            }
+                var domain = lookupDomains[i];
 
-            string lookupDomainName = _idnMapping.GetAscii(domainName).ToUpperInvariant();
-            var lookupNames = lookupDomainName.Split('.', StringSplitOptions.RemoveEmptyEntries);
-
-            var originalTld = originalNames[^1];
-            var lookupTld = lookupNames[^1];
-
-            if (_lookupTable.TryGetValue(lookupTld, out var upperLevelDomains) && upperLevelDomains != null)
-            {
-                string rootDomain = null;
-
-                foreach (var upperLevelDomain in upperLevelDomains)
+                if (!rule.SubDomains.TryGetValue(domain, out var subRule))
                 {
-                    bool exception = upperLevelDomain[0] == '!';
-                    var upperLevelNames =
-                        exception ?
-                        upperLevelDomain[1..].Split('.') :
-                        upperLevelDomain.Split('.');
-                    bool match = true;
-                    int lookupIndex = lookupNames.Length - 1;
-
-                    for (var i = upperLevelNames.Length - 1; i >= 0 && lookupIndex >= 0; i--)
+                    if (rule == _rules)
                     {
-                        if ((i == 0 && upperLevelNames[i] == "*") || lookupNames[--lookupIndex] == upperLevelNames[i])
-                        {
-                            // match
-                        }
-                        else
-                        {
-                            match = false;
-                            break;
-                        }
+                        // TLD does not match any suffix
+                        throw new PublicSuffixNotFoundException($"Top-level domain of {domainName} does not match any public suffix");
                     }
 
-                    if (match)
+                    if (i > 0)
                     {
-                        var potentialRootDomain = string.Join(".", originalNames[(Math.Max(0, originalNames.Length - upperLevelNames.Length - 2))..]);
-
-                        // Rules: https://github.com/publicsuffix/list/wiki/Format#format
-                        // An exclamation mark (!) at the start of a rule marks an exception to a previous wildcard rule. An exception rule takes priority over any other matching rule.
-                        if (exception)
-                        {
-                            return rootDomain;
-                        }
-
-                        // If a hostname matches more than one rule in the file, the longest matching rule (the one with the most levels) will be used.
-                        if (rootDomain == null || rootDomain.Length < potentialRootDomain.Length)
-                        {
-                            rootDomain = potentialRootDomain;
-                        }
+                        return string.Join(".", originalDomains[i..]);
                     }
+                    return domainName;
                 }
 
-                return rootDomain ?? $"{originalNames[^2]}.{originalTld}";
+                rule = subRule;
+
+                if (subRule.IsWildCard)
+                {
+                    // current node is a wildcard
+                    if (i <= 1)
+                    {
+                        // if there is only 1 or no domain to compare
+                        // return input value
+                        return domainName;
+                    }
+                    else if (subRule.SubDomains.Count > 0 && subRule.SubDomains.ContainsKey(lookupDomains[i - 1]))
+                    {
+                        // if there are lower level rules matching next domain, continue looking for apex domain 
+                        continue;
+                    }
+
+                    if (subRule.WildCardExceptions.Count > 0 && subRule.WildCardExceptions.Contains(lookupDomains[i - 1]))
+                    {
+                        // if next domain matches an wildcard exception, return 
+                        return string.Join(".", originalDomains[(i - 1)..]);
+                    }
+
+                    if (i > 2)
+                    {
+                        return string.Join(".", originalDomains[(i - 2)..]);
+                    }
+
+                    // return original input domain for all other cases
+                    return domainName;
+                }
+
             }
-            else
-            {
-                return $"{originalNames[^2]}.{originalTld}";
-            }
+
+            return domainName;
         }
 
         IEnumerator IEnumerable.GetEnumerator()
@@ -151,14 +150,25 @@ namespace DarkPeakLabs.PublicSuffix
             {
                 using var fileStream = AcquireLock();
                 UpdateList(fileStream);
-                PublicSuffixUtils.ReleaseFileLock(fileStream);
+                ReleaseLock(fileStream);
             }
+        }
+
+        private void ReleaseLock(FileStream fileStream)
+        {
+            PublicSuffixUtils.ReleaseFileLock(fileStream);
+            _logger.LogFileLockReleased(_options.FilePath);
         }
 
         private FileStream AcquireLock()
         {
             PublicSuffixUtils.CreateDirectoryIfNotExists(Path.GetDirectoryName(_options.FilePath));
-            return PublicSuffixUtils.AcquireFileLock(_options.FilePath);
+
+            _logger.LogAcquiringFileLock(_options.FilePath);
+            var fileStream = PublicSuffixUtils.AcquireFileLock(_options.FilePath);
+            _logger.LogFileLockAcquired(_options.FilePath);
+
+            return fileStream;
         }
 
         /// <summary>
@@ -168,9 +178,10 @@ namespace DarkPeakLabs.PublicSuffix
         {
             using var fileStream = AcquireLock();
 
-            if (fileStream.Length > 0)
+            if (fileStream.Length > 10)
             {
                 _timestamp = File.GetLastWriteTimeUtc(_options.FilePath);
+                _logger.LogFoundExistingFile(_options.FilePath, fileStream.Length, _timestamp.Value);
             }
 
             if (!_timestamp.HasValue || (DateTime.UtcNow - _timestamp.Value) > _options.UpdateAfter)
@@ -184,6 +195,7 @@ namespace DarkPeakLabs.PublicSuffix
                     using var resourceStream = GetType().Assembly.GetManifestResourceStream($"{GetType().Namespace}.data.public_suffix_list.dat");
                     using StreamReader reader = new(stream: resourceStream, encoding: Encoding.UTF8, leaveOpen: false);
                     ReadList(reader, null);
+                    _logger.LogDataInitializedFromResource();
                 }
             }
             else
@@ -192,7 +204,7 @@ namespace DarkPeakLabs.PublicSuffix
                 ReadList(reader, null);
             }
 
-            PublicSuffixUtils.ReleaseFileLock(fileStream);
+            ReleaseLock(fileStream);
         }
 
         private void ReadList(StreamReader reader, Action<string> lineAction)
@@ -203,7 +215,7 @@ namespace DarkPeakLabs.PublicSuffix
                 AppendSuffix(line);
                 lineAction?.Invoke(line);
             }
-            PopulateLookupTable();
+            UpdateRuleTree();
         }
 
         private void UpdateList(FileStream fileStream)
@@ -231,6 +243,12 @@ namespace DarkPeakLabs.PublicSuffix
             _timestamp = DateTime.UtcNow;
         }
 
+        /// <summary>
+        /// Get content stream for download url from options
+        /// </summary>
+        /// <param name="client"></param>
+        /// <returns></returns>
+        /// <exception cref="PublicSuffixListDownloadException"></exception>
         private Stream GetStream(HttpClient client)
         {
             int attempt = 0;
@@ -245,6 +263,7 @@ namespace DarkPeakLabs.PublicSuffix
 
                 if (attempt >= 3)
                 {
+                    _logger?.LogDataFileDownloadFailed(_options.DownloadUrl, error.Message);
                     throw new PublicSuffixListDownloadException(error.Message, error);
                 }
 
@@ -253,6 +272,13 @@ namespace DarkPeakLabs.PublicSuffix
             while (true);
         }
 
+        /// <summary>
+        /// Attempts to get HTTP response content stream
+        /// </summary>
+        /// <param name="client"></param>
+        /// <param name="stream"></param>
+        /// <param name="error"></param>
+        /// <returns></returns>
         private bool TryGetStream(HttpClient client, out Stream stream, out Exception error)
         {
             try
@@ -299,47 +325,46 @@ namespace DarkPeakLabs.PublicSuffix
             _list.Add(line);
         }
 
-        private void PopulateLookupTable()
+        /// <summary>
+        /// Updates internal rule tree
+        /// </summary>
+        private void UpdateRuleTree()
         {
-            _lookupTable = [];
+            _rules = new(".");
+            PublicSuffixRule rule = null;
 
-            foreach (var item in _list)
+            foreach (var suffix in _list)
             {
-                var asciiItem = _idnMapping.GetAscii(item);
-                var domains = asciiItem.ToUpperInvariant().Split('.', StringSplitOptions.RemoveEmptyEntries);
+                // convert suffix to ASCII
+                var asciiSuffix = _idnMapping.GetAscii(suffix);
 
-                var tld = domains[^1];
-                var keyExists = _lookupTable.TryGetValue(tld, out var upperLevelDomains);
+                // split suffix to domains
+                var domains = asciiSuffix.ToUpperInvariant().Split('.', StringSplitOptions.RemoveEmptyEntries);
 
-                if (domains.Length == 1)
+                rule = _rules;
+                for (int i = domains.Length - 1; i >= 0; i--)
                 {
-                    if (keyExists)
+                    var domain = domains[i];
+
+                    // Rules: https://github.com/publicsuffix/list/wiki/Format#format
+                    if (domain.Length == 1 && domain[0] == '*')
                     {
-                        continue;
+                        rule.IsWildCard = true;
+                        break;
                     }
-                    else
+                    else if (domain[0] == '!')
                     {
-                        _lookupTable.Add(tld, null);
+                        // An exclamation mark (!) at the start of a rule marks an exception to a previous wildcard rule. An exception rule takes priority over any other matching rule.
+                        rule.WildCardExceptions.Add(domain[1..]);
+                        break;
                     }
-                }
-                else
-                {
-                    var head = asciiItem[..^(tld.Length + 1)].ToUpperInvariant();
-                    if (keyExists)
+
+                    if (!rule.SubDomains.TryGetValue(domain, out var childNode))
                     {
-                        if (upperLevelDomains == null)
-                        {
-                            _lookupTable[tld] = [head];
-                        }
-                        else
-                        {
-                            upperLevelDomains.Add(head);
-                        }
+                        childNode = new PublicSuffixRule(domain);
+                        rule.SubDomains.Add(domain, childNode);
                     }
-                    else
-                    {
-                        _lookupTable.Add(tld, [head]);
-                    }
+                    rule = childNode;
                 }
             }
         }
