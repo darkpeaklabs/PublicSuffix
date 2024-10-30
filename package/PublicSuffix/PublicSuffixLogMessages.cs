@@ -6,6 +6,7 @@ namespace DarkPeakLabs.PublicSuffix
     internal static partial class PublicSuffixLogMessages
     {
         [LoggerMessage(
+            EventId = 1,
             Message = "Downloading data from {Uri}, Attempt: {Attempt}",
             Level = LogLevel.Information)]
         internal static partial void LogDownloadingDataFile(
@@ -14,6 +15,7 @@ namespace DarkPeakLabs.PublicSuffix
             int attempt);
 
         [LoggerMessage(
+            EventId = 2,
             Message = "Acquiring file lock {Path}",
             Level = LogLevel.Information)]
         internal static partial void LogAcquiringFileLock(
@@ -21,6 +23,7 @@ namespace DarkPeakLabs.PublicSuffix
             string path);
 
         [LoggerMessage(
+            EventId = 3,
             Message = "File lock {Path} acquired",
             Level = LogLevel.Information)]
         internal static partial void LogFileLockAcquired(
@@ -28,6 +31,7 @@ namespace DarkPeakLabs.PublicSuffix
             string path);
 
         [LoggerMessage(
+            EventId = 4,
             Message = "File lock {Path} released",
             Level = LogLevel.Information)]
         internal static partial void LogFileLockReleased(
@@ -35,6 +39,7 @@ namespace DarkPeakLabs.PublicSuffix
             string path);
 
         [LoggerMessage(
+            EventId = 5,
             Message = "Found existing file {Path}, size {Size}, last modified on {LastModified}",
             Level = LogLevel.Information)]
         internal static partial void LogFoundExistingFile(
@@ -44,12 +49,14 @@ namespace DarkPeakLabs.PublicSuffix
             DateTime lastModified);
 
         [LoggerMessage(
+            EventId = 6,
             Message = "Data initialized from embedded resource",
             Level = LogLevel.Information)]
                 internal static partial void LogDataInitializedFromResource(
             this ILogger logger);
 
         [LoggerMessage(
+            EventId = 7,
             Message = "Data initialized from file {Path}",
             Level = LogLevel.Information)]
         internal static partial void LogDataInitializedFromFile(
@@ -57,6 +64,7 @@ namespace DarkPeakLabs.PublicSuffix
             string path);
 
         [LoggerMessage(
+            EventId = 8,
             Message = "Downloading file from {Url} failed with error: {Error}",
             Level = LogLevel.Error)]
         internal static partial void LogDataFileDownloadFailed(

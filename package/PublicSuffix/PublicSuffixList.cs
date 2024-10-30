@@ -67,7 +67,7 @@ namespace DarkPeakLabs.PublicSuffix
 
         public string GetDomainApex(string domainName)
         {
-            ArgumentNullException.ThrowIfNullOrWhiteSpace(domainName, nameof(domainName));
+            _ = domainName ?? throw new ArgumentNullException(nameof(domainName));
 
             var originalDomains = domainName.Split('.', StringSplitOptions.RemoveEmptyEntries);
 
@@ -193,14 +193,24 @@ namespace DarkPeakLabs.PublicSuffix
                 else
                 {
                     using var resourceStream = GetType().Assembly.GetManifestResourceStream($"{GetType().Namespace}.data.public_suffix_list.dat");
-                    using StreamReader reader = new(stream: resourceStream, encoding: Encoding.UTF8, leaveOpen: false);
+                    using StreamReader reader = new(
+                        stream: resourceStream, 
+                        encoding: Encoding.UTF8,
+                        detectEncodingFromByteOrderMarks: false,
+                        bufferSize: 4096, 
+                        leaveOpen: false);
                     ReadList(reader, null);
                     _logger.LogDataInitializedFromResource();
                 }
             }
             else
             {
-                using StreamReader reader = new(stream: fileStream, encoding: Encoding.UTF8, leaveOpen: true);
+                using StreamReader reader = new(
+                    stream: fileStream, 
+                    encoding: Encoding.UTF8,
+                    detectEncodingFromByteOrderMarks: false,
+                    bufferSize: 4096, 
+                    leaveOpen: true);
                 ReadList(reader, null);
             }
 
@@ -234,9 +244,15 @@ namespace DarkPeakLabs.PublicSuffix
             using StreamWriter writer = new(
                 stream: fileStream,
                 encoding: Encoding.UTF8,
+                bufferSize: 4096,
                 leaveOpen: true);
 
-            using StreamReader reader = new(GetStream(client), encoding: Encoding.UTF8, leaveOpen: false);
+            using StreamReader reader = new(
+                GetStream(client), 
+                encoding: Encoding.UTF8,
+                detectEncodingFromByteOrderMarks: false,
+                bufferSize: 4096,
+                leaveOpen: false);
 
             _list.Clear();
             ReadList(reader, (line) => writer.WriteLine(line));
@@ -284,7 +300,7 @@ namespace DarkPeakLabs.PublicSuffix
             try
             {
                 var response = client.GetAsync(_options.DownloadUrl).GetAwaiter().GetResult();
-                stream = response.Content.ReadAsStream();
+                stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
                 error = null;
                 return true;
             }

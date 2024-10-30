@@ -6,7 +6,7 @@ namespace DarkPeakLabs.PublicSuffix
 {
     internal static class PublicSuffixUtils
     {
-        private static readonly TimeSpan pollingInterval = TimeSpan.FromMicroseconds(300);
+        private static readonly TimeSpan pollingInterval = TimeSpan.FromMilliseconds(300);
         private const int MaxAttempts = 3;
 
         public static void CreateDirectoryIfNotExists(string path)
