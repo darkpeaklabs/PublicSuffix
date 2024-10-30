@@ -1,31 +1,60 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <AssemblyName>DarkPeakLabs.PublicSuffix</AssemblyName>
-    <RootNamespace>DarkPeakLabs.PublicSuffix</RootNamespace>
-    <AssemblyVersion>1.0.*</AssemblyVersion>
-    <Deterministic>false</Deterministic>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<AssemblyName>DarkPeakLabs.PublicSuffix</AssemblyName>
+		<RootNamespace>DarkPeakLabs.PublicSuffix</RootNamespace>
+		<AssemblyVersion>1.0.*</AssemblyVersion>
+		<Deterministic>false</Deterministic>
 
-  <PropertyGroup>
-    <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisMode>AllEnabledByDefault</AnalysisMode>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <NoWarn>7035</NoWarn>
-  </PropertyGroup>
+		<PackageId>DarkPeakLabs.PublicSuffix</PackageId>
+		<Version>1.0.0</Version>
+		<Authors>JiriRichter</Authors>
+		<Company>DarkPeakLabs</Company>
+		<Product>DarkPeakLabs.PublicSuffix</Product>
+		<Title>Public Suffix List Library</Title>
+		<Description>A .net library for programmatic access to the public suffix list https://publicsuffix.org/</Description>
+		<PackageProjectUrl>https://github.com/darkpeaklabs/PublicSuffix</PackageProjectUrl>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<RepositoryUrl>https://github.com/darkpeaklabs/PublicSuffix</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<IncludeSymbols>True</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+		<PackageLicenseFile>LICENSE</PackageLicenseFile>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <None Remove="data\public_suffix_list.dat" />
-    <None Remove="data\public_suffix_list.dat.txt" />
-  </ItemGroup>
+	<PropertyGroup>
+		<EnableNETAnalyzers>true</EnableNETAnalyzers>
+		<AnalysisMode>AllEnabledByDefault</AnalysisMode>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<NoWarn>7035</NoWarn>
+		<Copyright>Copyright (c) DarkPeakLabs 2024</Copyright>
+		<PackageTags>public suffix list;dns;domain name,domain apex, domain root</PackageTags>
+		<PackageReleaseNotes>https://github.com/darkpeaklabs/PublicSuffix/blob/main/CHANGELOG.md</PackageReleaseNotes>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Include="data\public_suffix_list.dat" />
-  </ItemGroup>
+	<ItemGroup>
+		<None Remove="data\public_suffix_list.dat" />
+		<None Remove="data\public_suffix_list.dat.txt" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
-  </ItemGroup>
+	<ItemGroup>
+		<EmbeddedResource Include="data\public_suffix_list.dat" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="..\..\README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\..\LICENSE">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
+	</ItemGroup>
 
 </Project>
