@@ -7,7 +7,7 @@ namespace DarkPeakLabs.PublicSuffix
     {
         private const string AppName = "PublicSuffix";
 
-        public bool DownloadFile { get; set; } = true;
+        public bool AutoUpdate { get; set; } = true;
 
         public Uri DownloadUrl { get; set; } = new Uri("https://publicsuffix.org/list/public_suffix_list.dat");
 
@@ -18,6 +18,6 @@ namespace DarkPeakLabs.PublicSuffix
                 AppName,
                 "public_suffix_list.dat");
 
-        public TimeSpan UpdateAfter { get; set; } = TimeSpan.FromDays(1);
+        public TimeSpan UpdateInterval { get; set; } = TimeSpan.FromDays(1);
     }
 }

@@ -146,7 +146,7 @@ namespace DarkPeakLabs.PublicSuffix
                 _list = [];
                 InitializeList();
             }
-            else if (_options.DownloadFile && (DateTime.UtcNow - _timestamp.Value) > _options.UpdateAfter)
+            else if (_options.AutoUpdate && (DateTime.UtcNow - _timestamp.Value) > _options.UpdateInterval)
             {
                 using var fileStream = AcquireLock();
                 UpdateList(fileStream);
@@ -184,9 +184,9 @@ namespace DarkPeakLabs.PublicSuffix
                 _logger.LogFoundExistingFile(_options.FilePath, fileStream.Length, _timestamp.Value);
             }
 
-            if (!_timestamp.HasValue || (DateTime.UtcNow - _timestamp.Value) > _options.UpdateAfter)
+            if (!_timestamp.HasValue || (DateTime.UtcNow - _timestamp.Value) > _options.UpdateInterval)
             {
-                if (_options.DownloadFile)
+                if (_options.AutoUpdate)
                 {
                     UpdateList(fileStream);
                 }

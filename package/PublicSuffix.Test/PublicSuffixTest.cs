@@ -31,8 +31,8 @@ namespace DarkPeakLabs.PublicSuffix.Test
         {
             var options = new PublicSuffixListOptions() 
             {
-                DownloadFile = true,
-                UpdateAfter = TimeSpan.FromSeconds(30),
+                AutoUpdate = true,
+                UpdateInterval = TimeSpan.FromSeconds(30),
             };
 
             ClearData(options);
@@ -49,7 +49,7 @@ namespace DarkPeakLabs.PublicSuffix.Test
             Assert.Equal(count, list.Count);
             Assert.Equal(lastWriteTime, File.GetLastWriteTimeUtc(options.FilePath));
 
-            Thread.Sleep(options.UpdateAfter + TimeSpan.FromSeconds(3));
+            Thread.Sleep(options.UpdateInterval + TimeSpan.FromSeconds(3));
 
             list = new(options, _loggerFactory);
             Assert.Equal(count, list.Count);
@@ -61,8 +61,8 @@ namespace DarkPeakLabs.PublicSuffix.Test
         {
             var options = new PublicSuffixListOptions()
             {
-                DownloadFile = false,
-                UpdateAfter = TimeSpan.FromSeconds(30)
+                AutoUpdate = false,
+                UpdateInterval = TimeSpan.FromSeconds(30)
             };
 
             ClearData(options);
@@ -74,7 +74,7 @@ namespace DarkPeakLabs.PublicSuffix.Test
             Assert.True(File.Exists(options.FilePath));
             var lastWriteTime = File.GetLastWriteTimeUtc(options.FilePath);
 
-            Thread.Sleep(options.UpdateAfter + TimeSpan.FromSeconds(3));
+            Thread.Sleep(options.UpdateInterval + TimeSpan.FromSeconds(3));
 
             list = new(options, _loggerFactory);
             Assert.Equal(count, list.Count);
@@ -86,7 +86,7 @@ namespace DarkPeakLabs.PublicSuffix.Test
         {
             var options = new PublicSuffixListOptions()
             {
-                DownloadFile = true,
+                AutoUpdate = true,
                 DownloadUrl = new Uri($"https://{Guid.NewGuid()}.test/data.txt"),
                 DownloadTimeout = TimeSpan.FromSeconds(5)
             };

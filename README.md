@@ -37,3 +37,11 @@ var options = new PublicSuffixListOptions()
 PublicSuffixList list = new(options, _loggerFactory);
 ```
 
+## Options
+
+|Option|Default Value|Description|
+|---|---|---|
+|**DownloadUrl**|https://publicsuffix.org/list/public_suffix_list.dat|If auto update is enabled, the list data will be downloaded from this URL|
+|**AutoUpdate**|true|When set to true, the list will be automatically updated with with interval specified by **UpdateInterval**|
+|**UpdateInterval**|24 hours|The auto-update interval. When **AutoUpdate** is false, this setting is ignored|
+|**FilePath**|PublicSuffix/public_suffix_list.dat under the common application folder|The file location where the list data is cached|
