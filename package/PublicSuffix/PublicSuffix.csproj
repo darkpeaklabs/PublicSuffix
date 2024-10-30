@@ -9,8 +9,8 @@
 		<Deterministic>false</Deterministic>
 
 		<PackageId>DarkPeakLabs.PublicSuffix</PackageId>
-		<Version>1.0.3</Version>
-		<Authors>JiriRichter</Authors>
+		<Version>1.0.4</Version>
+		<Authors>DarkPeakLabs</Authors>
 		<Company>DarkPeakLabs</Company>
 		<Product>DarkPeakLabs.PublicSuffix</Product>
 		<Title>Public Suffix List Library</Title>
