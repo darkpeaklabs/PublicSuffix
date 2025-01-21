@@ -3,7 +3,7 @@
 namespace DarkPeakLabs.PublicSuffix
 {
     [Serializable]
-    public class PublicSuffixNotFoundException : PublicSuffixException
+    public class PublicSuffixNotFoundException : PublicSuffixAcquireLockException
     {
         public PublicSuffixNotFoundException()
         {

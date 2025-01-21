@@ -23,15 +23,16 @@ namespace DarkPeakLabs.PublicSuffix
                 {
                     if (attempt >= MaxAttempts)
                     {
-                        throw new PublicSuffixException($"Unable to create folder {path}: {e.Message}", e);
+                        throw new PublicSuffixAcquireLockException($"Unable to create folder {path}: {e.Message}", e);
                     }
                     Thread.Sleep(pollingInterval);
                 }
             }
         }
 
-        public static FileStream AcquireFileLock(string path)
+        public static FileStream AcquireFileLock(string path, TimeSpan timeout)
         {
+            TimeSpan waitTime = TimeSpan.Zero;
             do
             {
                 if (TryAcquireFileLock(path, out var fileStream))
@@ -39,8 +40,11 @@ namespace DarkPeakLabs.PublicSuffix
                     return fileStream;
                 }
                 Thread.Sleep(pollingInterval);
+                waitTime += pollingInterval;
             }
-            while (true);
+            while (waitTime < timeout);
+
+            throw new PublicSuffixAcquireLockException($"Timeout acquiring file lock {path}");
         }
 
         public static void ReleaseFileLock(FileStream fileStream)

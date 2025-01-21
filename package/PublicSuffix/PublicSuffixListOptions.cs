@@ -19,5 +19,7 @@ namespace DarkPeakLabs.PublicSuffix
                 "public_suffix_list.dat");
 
         public TimeSpan UpdateInterval { get; set; } = TimeSpan.FromDays(1);
+
+        public TimeSpan LockTimeout { get; set; } = TimeSpan.FromSeconds(10);
     }
 }

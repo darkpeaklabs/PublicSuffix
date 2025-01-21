@@ -3,7 +3,7 @@
 namespace DarkPeakLabs.PublicSuffix
 {
     [Serializable]
-    public class PublicSuffixListDownloadException : PublicSuffixException
+    public class PublicSuffixListDownloadException : PublicSuffixAcquireLockException
     {
         public PublicSuffixListDownloadException()
         {

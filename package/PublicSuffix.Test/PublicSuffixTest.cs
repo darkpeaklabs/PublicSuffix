@@ -32,7 +32,7 @@ namespace DarkPeakLabs.PublicSuffix.Test
             var options = new PublicSuffixListOptions() 
             {
                 AutoUpdate = true,
-                UpdateInterval = TimeSpan.FromSeconds(30),
+                UpdateInterval = TimeSpan.FromSeconds(10),
             };
 
             ClearData(options);
@@ -233,6 +233,16 @@ namespace DarkPeakLabs.PublicSuffix.Test
             Assert.Equal("test.any.ex.futurecms.at", list.GetDomainApex("test.any.ex.futurecms.at"));
             Assert.Equal("test.any.ex.futurecms.at", list.GetDomainApex("sub.test.any.ex.futurecms.at"));
             Assert.Equal("test.any.ex.futurecms.at", list.GetDomainApex("sub1.sub2.test.any.ex.futurecms.at"));
+        }
+
+        [Fact]
+        public void TestConstructor()
+        {
+            PublicSuffixList list = new();
+            list.GetDomainApex("data.microsoft.com");
+
+            list = new(_loggerFactory);
+            list.GetDomainApex("data.microsoft.com");
         }
 
         [Fact]

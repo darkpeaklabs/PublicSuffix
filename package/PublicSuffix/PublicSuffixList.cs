@@ -13,6 +13,8 @@ namespace DarkPeakLabs.PublicSuffix
 {
     public class PublicSuffixList : IReadOnlyList<string>
     {
+        private const string EndOfList = "// ===END PRIVATE DOMAINS===";
+
         private static readonly object _lock = new();
         private static readonly IdnMapping _idnMapping = new();
 
@@ -57,7 +59,7 @@ namespace DarkPeakLabs.PublicSuffix
         public PublicSuffixList(PublicSuffixListOptions options, ILoggerFactory loggerFactory)
         {
             _options = options;
-            _logger = loggerFactory.CreateLogger<PublicSuffixList>();
+            _logger = loggerFactory?.CreateLogger<PublicSuffixList>();
         }
 
         public IEnumerator<string> GetEnumerator()
@@ -75,7 +77,8 @@ namespace DarkPeakLabs.PublicSuffix
                 .ToUpperInvariant()
                 .Split('.', StringSplitOptions.RemoveEmptyEntries);
 
-            var rule = _rules;
+            var rules = GetRules();
+            var rule = rules;
 
             // If a hostname matches more than one rule in the file, the longest matching rule (the one with the most levels) will be used.
             for (var i = lookupDomains.Length - 1; i >= 0; i--) 
@@ -84,7 +87,7 @@ namespace DarkPeakLabs.PublicSuffix
 
                 if (!rule.SubDomains.TryGetValue(domain, out var subRule))
                 {
-                    if (rule == _rules)
+                    if (rule == rules)
                     {
                         // TLD does not match any suffix
                         throw new PublicSuffixNotFoundException($"Top-level domain of {domainName} does not match any public suffix");
@@ -139,6 +142,15 @@ namespace DarkPeakLabs.PublicSuffix
             return List.GetEnumerator();
         }
 
+        private PublicSuffixRule GetRules()
+        {
+            lock (_lock)
+            {
+                InitializeOrUpdateList();
+                return _rules;
+            }
+        }
+
         private void InitializeOrUpdateList()
         {
             if (_list == null)
@@ -157,16 +169,16 @@ namespace DarkPeakLabs.PublicSuffix
         private void ReleaseLock(FileStream fileStream)
         {
             PublicSuffixUtils.ReleaseFileLock(fileStream);
-            _logger.LogFileLockReleased(_options.FilePath);
+            _logger?.LogFileLockReleased(_options.FilePath);
         }
 
         private FileStream AcquireLock()
         {
             PublicSuffixUtils.CreateDirectoryIfNotExists(Path.GetDirectoryName(_options.FilePath));
 
-            _logger.LogAcquiringFileLock(_options.FilePath);
-            var fileStream = PublicSuffixUtils.AcquireFileLock(_options.FilePath);
-            _logger.LogFileLockAcquired(_options.FilePath);
+            _logger?.LogAcquiringFileLock(_options.FilePath);
+            var fileStream = PublicSuffixUtils.AcquireFileLock(_options.FilePath, _options.LockTimeout);
+            _logger?.LogFileLockAcquired(_options.FilePath);
 
             return fileStream;
         }
@@ -178,13 +190,33 @@ namespace DarkPeakLabs.PublicSuffix
         {
             using var fileStream = AcquireLock();
 
-            if (fileStream.Length > 10)
+            // non-zero file length indicates the file already exists
+            if (fileStream.Length > 0)
             {
                 _timestamp = File.GetLastWriteTimeUtc(_options.FilePath);
-                _logger.LogFoundExistingFile(_options.FilePath, fileStream.Length, _timestamp.Value);
+                _logger?.LogFoundExistingFile(_options.FilePath, fileStream.Length, _timestamp.Value);
             }
 
-            if (!_timestamp.HasValue || (DateTime.UtcNow - _timestamp.Value) > _options.UpdateInterval)
+            if (_options.AutoUpdate)
+            {
+
+            }
+
+            bool listInitialized = false;
+            // attempt to read existing file if it already exists and is not expired
+            if (_timestamp.HasValue && (DateTime.UtcNow - _timestamp.Value) < _options.UpdateInterval)
+            {
+                using StreamReader reader = new(
+                    stream: fileStream,
+                    encoding: Encoding.UTF8,
+                    detectEncodingFromByteOrderMarks: false,
+                    bufferSize: 4096,
+                    leaveOpen: true);
+
+                listInitialized = ReadList(reader, null);
+            }
+
+            if (!listInitialized)
             {
                 if (_options.AutoUpdate)
                 {
@@ -200,32 +232,50 @@ namespace DarkPeakLabs.PublicSuffix
                         bufferSize: 4096, 
                         leaveOpen: false);
                     ReadList(reader, null);
-                    _logger.LogDataInitializedFromResource();
+                    _logger?.LogDataInitializedFromResource();
                 }
             }
             else
             {
-                using StreamReader reader = new(
-                    stream: fileStream, 
-                    encoding: Encoding.UTF8,
-                    detectEncodingFromByteOrderMarks: false,
-                    bufferSize: 4096, 
-                    leaveOpen: true);
-                ReadList(reader, null);
             }
 
             ReleaseLock(fileStream);
         }
 
-        private void ReadList(StreamReader reader, Action<string> lineAction)
+        private bool ReadList(StreamReader reader, StreamWriter writer)
         {
+            string line = null;
+
             while (!reader.EndOfStream)
             {
-                var line = reader.ReadLine();
-                AppendSuffix(line);
-                lineAction?.Invoke(line);
+                line = reader.ReadLine();
+                writer?.WriteLine(line);
+
+                if (line.Length < 2 || string.IsNullOrWhiteSpace(line))
+                {
+                    // empty line
+                    continue;
+                }
+
+                line = line.Trim();
+
+                if (line[0] == '/' && line[1] == '/')
+                {
+                    // comment
+                    continue;
+                }
+
+                _list.Add(line);
             }
+
+            if (line == null || !line.StartsWith(EndOfList, StringComparison.OrdinalIgnoreCase))
+            {
+                // the file is not complete
+                return false;
+            }
+
             UpdateRuleTree();
+            return true;
         }
 
         private void UpdateList(FileStream fileStream)
@@ -255,7 +305,7 @@ namespace DarkPeakLabs.PublicSuffix
                 leaveOpen: false);
 
             _list.Clear();
-            ReadList(reader, (line) => writer.WriteLine(line));
+            ReadList(reader, writer);
             _timestamp = DateTime.UtcNow;
         }
 
@@ -316,29 +366,6 @@ namespace DarkPeakLabs.PublicSuffix
                 error = e;
                 return false;
             }
-        }
-
-        /// <summary>
-        /// Append a public suffix to the internal list
-        /// </summary>
-        /// <param name="line"></param>
-        private void AppendSuffix(string line)
-        {
-            if (string.IsNullOrWhiteSpace(line) || line.Length < 2)
-            {
-                // empty line
-                return;
-            }
-
-            line = line.Trim();
-
-            if (line[0] == '/' && line[1] == '/')
-            {
-                // comment
-                return;
-            }
-
-            _list.Add(line);
         }
 
         /// <summary>
